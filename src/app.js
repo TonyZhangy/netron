@@ -338,6 +338,12 @@ class Application {
                     accelerator: 'CmdOrCtrl+Shift+E',
                     click: () => this._export(),
                 },
+                { 
+                    id: 'file.export',
+                    label: '&Export Param...',
+                    accelerator: 'CmdOrCtrl+Shift+E',
+                    click: () => this._export(),
+                },
                 { type: 'separator' },
                 { role: 'close' },
             ]

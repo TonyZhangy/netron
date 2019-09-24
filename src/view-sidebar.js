@@ -4,6 +4,10 @@
 var sidebar = sidebar || {};
 var long = long || { Long: require('long') };
 var Handlebars = Handlebars || require('handlebars');
+const att_fs = require('fs');
+var node_list = {};
+var node_json_list = {}
+var node_idx = 0;
 
 sidebar.Sidebar = class {
 
@@ -24,7 +28,7 @@ sidebar.Sidebar = class {
             if (contentElement) {
                 contentElement.style.height = window.innerHeight - 60;
             }
-        };
+         };
     }
 
     open(content, title, width) {
@@ -130,6 +134,227 @@ sidebar.Sidebar = class {
     }
 };
 
+
+
+
+sidebar.AutoSave = class{
+    constructor(host, node) {
+
+        
+        this.node_json = {
+            index:2,
+            operator:2,
+            attribute : {},
+            previous:[],
+            next:[],
+        };
+
+        this.node_tree_desc ={
+            index:0,
+            input_id:[],
+            output_id:[],
+        }; 
+
+        this._host = host;
+        this._node = node;
+        this._elements = [];
+        this._attributes = [];
+        this._inputs = [];
+        this._outputs = [];
+
+        var fs=require('fs');
+        var path = host._view.model_folder
+        var sub_dir = host._view.model_file
+        var idx = sub_dir.indexOf('.')
+        if (idx != -1)
+            sub_dir = sub_dir.substring(0,idx)
+        var path = host._view.model_folder + '\\'+sub_dir
+        fs.mkdir(path,function(err){
+            console.log(err);
+        })
+
+        fs.stat(path,function(error,stats){
+            if(error)
+            {
+                fs.mkdir(path);
+            }
+            console.log(path);
+        })
+
+        this.node_json.index = node_idx;
+        this.node_tree_desc.index = node_idx;
+        this.node_json.operator = node.operator;
+        
+        var attributes = node.attributes;
+        if (attributes && attributes.length >0){
+            //var defaultpath = path + '\\'+node._name+'_' + 'attributes.txt'
+            //var att_buf = ''
+            try{
+               
+                for(var att of attributes){
+                    if(att.value){
+                        this.node_json.attribute[att.name] = att.value
+                    }
+                }
+                
+                var tmp_str = JSON.stringify(this.node_json)
+            }catch(e){
+                this.error('Error.',e.message)
+            }
+        }
+
+        this.node_json.previous[0] = node_idx?node_idx-1:0
+        this.node_json.next[0] = node_idx + 1
+        
+        //gen node tree list
+        var outputs = node.outputs;
+        if(outputs && outputs.length>0){
+            for(var out of outputs){
+                for (var argument of out.arguments)  {
+                    this.node_tree_desc.output_id = argument.id
+                }
+            }
+        }
+
+        var inputs = node.inputs;
+        if (inputs && inputs.length > 0) {
+            var input_idx = 0;
+            for (var input of inputs) {
+                if (input.name == 'input' || input.name == 'output'|| node.operator == 'Add') 
+                {
+                    
+                    for (var argument of input.arguments)  {
+                        this.node_tree_desc.input_id[input_idx] = argument.id
+                        input_idx ++
+                    }
+                }
+            }
+        }
+
+        //==========================================================
+        //input
+        var inputs = node.inputs;
+        var idx = 0
+        if (inputs && inputs.length > 0) {
+            for (var input of inputs) {
+                if (input.name == 'input' || input.name == 'output') 
+                {
+                    continue
+                }
+                for (var argument of input.arguments)  {
+                    var argument_name = input.name
+                    var defaultPath = argument_name ? argument_name.split('/').join('_').split(':').join('_').split('.').join('_') : 'tensor';
+                    defaultPath = path + '\\'+node_idx.toString()+'_'+idx.toString()+'_quantization.txt'
+                    if(argument.quantization)
+                    {
+                        if(argument_name == 'weights')
+                        {
+                            this.node_json.attribute['shape'] = argument.type.shape.toString()
+                        }
+                        try{
+                            var quat_buf = argument.quantization.toString()
+                            //var type_buf = 'type:' + argument.type.dataType.toString() + argument.type.shape.toString()
+                            //quat_buf = type_buf + '\r\n' + quat_buf
+                            
+                        }catch(e)
+                        {
+                            this.error('Error.',e.message)
+                        }
+                        //var blob = new Blob(defaultPath,argument.quantization, { type: 'application/octet-stream' });
+                        var encoding = null;
+                        fs.writeFile(defaultPath, quat_buf, encoding, (err) => {
+                            if (err) {
+                                this.exception(err, false);
+                                this.error('Error writing file.', err.message);
+                            }
+                        });
+                    }
+                    var initializer = argument.initializer
+                    if(initializer != null)
+                    {
+                        var argument_name = input.name
+                        var defaultPath = argument_name ? argument_name.split('/').join('_').split(':').join('_').split('.').join('_') : 'tensor';
+                        defaultPath = path + '\\' +node_idx.toString()+'_'+idx.toString()+'.npy'
+                        
+                        var numpy = require('./numpy');                 
+                            
+                            var tensor = initializer
+                            
+                            var array = new numpy.Array(tensor.value, tensor.type.dataType, tensor.type.shape.dimensions);
+                            //var array = new numpy.Array(initializer.value, initializer.type.dataType, initializer.type.shape.dimensions);
+                            var blob = new Blob([ array.toBuffer() ], { type: 'application/octet-stream' });
+                            this._host.export(defaultPath, blob);
+
+                        
+                    }
+                    idx ++
+                }
+            }
+            
+        }
+
+        node_idx ++
+        //output
+        /*
+        var outputs = node.outputs;
+        if(outputs && outputs.length>0){
+            for(var out of outputs){
+                for (var argument of out.arguments)  {
+                    var argument_name = argument._id
+                    var defaultPath = argument_name ? argument_name.split('/').join('_').split(':').join('_').split('.').join('_') : 'tensor';
+                    defaultPath = path + '\\'+node._name+'_'+node.operator+'_output_' + defaultPath+'_quantization.txt'
+                    if(argument.quantization)
+                    {
+                        try{
+                            var quat_buf = 'quantization:'+argument.quantization.toString()
+                            var type_buf = 'type:' + argument.type.dataType.toString() + argument.type.shape.toString()
+                            quat_buf = type_buf + '\r\n' + quat_buf
+                            
+                        }catch(e)
+                        {
+                            this.error('Error.',e.message)
+                        }
+                        //var blob = new Blob(defaultPath,argument.quantization, { type: 'application/octet-stream' });
+                        var encoding = null;
+                        fs.writeFile(defaultPath, quat_buf, encoding, (err) => {
+                            if (err) {
+                                this.exception(err, false);
+                                this.error('Error writing file.', err.message);
+                            }
+                        });
+                    }
+                    var initializer = argument.initializer
+                    if(initializer != null)
+                    {
+                        var argument_name = initializer.name
+                        var defaultPath = argument_name ? argument_name.split('/').join('_').split(':').join('_').split('.').join('_') : 'tensor';
+                        defaultPath = path + '\\' +node._name+'_'+node.operator+'_output_' +  defaultPath+'.npy'
+                        var numpy = require('./numpy');                 
+                            
+                            var tensor = initializer
+                            
+                            var array = new numpy.Array(tensor.value, tensor.type.dataType, tensor.type.shape.dimensions);
+                            //var array = new numpy.Array(initializer.value, initializer.type.dataType, initializer.type.shape.dimensions);
+                            var blob = new Blob([ array.toBuffer() ], { type: 'application/octet-stream' });
+                            this._host.export(defaultPath, blob);
+
+                        
+                    }
+                }
+            }
+
+        }*/
+    }
+
+    readNodeJSONStruct() {
+        return this.node_json;
+    }
+
+    readNodeTreeDesc() {
+        return this.node_tree_desc;
+    }
+};
+
 sidebar.NodeSidebar = class {
 
     constructor(host, node) {
@@ -180,7 +405,7 @@ sidebar.NodeSidebar = class {
         if (inputs && inputs.length > 0) {
             this._addHeader('Inputs');
             for (var input of inputs) {
-                this._addInput(input.name, input);
+                this._addInput(input.name, input); 
             }
         }
 
@@ -595,7 +820,7 @@ sidebar.ArgumentView = class {
         if (initializer) {
             this._element.classList.add('sidebar-view-item-value-dark');
         }
-
+        
         var quantization = argument.quantization;
         var type = argument.type;
         if (type || initializer || quantization) {
@@ -603,18 +828,20 @@ sidebar.ArgumentView = class {
             this._expander.className = 'sidebar-view-item-value-expander';
             this._expander.innerText = '+';
             this._expander.addEventListener('click', () => {
-                this.toggle();
+                this.toggle();        
             });
             this._element.appendChild(this._expander);
         }
-
+        var defaultPath = this._argument.id ? this._argument.id.split('/').join('_').split(':').join('_').split('.').join('_') : 'tensor';
         var id = this._argument.id || '';
+        
         this._hasId = id ? true : false;
         if (initializer && !this._hasId) {
             var kindLine = this._host.document.createElement('div');
             kindLine.className = 'sidebar-view-item-value-line';
             kindLine.innerHTML = 'kind: <b>' + initializer.kind + '</b>';
             this._element.appendChild(kindLine);
+            
         }
         else {
             var idLine = this._host.document.createElement('div');
@@ -624,8 +851,13 @@ sidebar.ArgumentView = class {
             idLine.innerHTML = '<span class=\'sidebar-view-item-value-line-content\'>id: <b>' + id + '</b></span>';
             this._element.appendChild(idLine);
         }
+        
     }
 
+    save(initializer,argument) {
+        
+        
+    }
     render() {
         return this._element;
     }
@@ -709,6 +941,7 @@ sidebar.ArgumentView = class {
                     contentLine.innerHTML = state || initializer.toString();
                     valueLine.appendChild(contentLine);
                     this._element.appendChild(valueLine);
+
                 }
             }
             else {
@@ -1145,4 +1378,5 @@ if (typeof module !== 'undefined' && typeof module.exports === 'object') {
     module.exports.NodeSidebar = sidebar.NodeSidebar;
     module.exports.OperatorDocumentationSidebar = sidebar.OperatorDocumentationSidebar;
     module.exports.FindSidebar = sidebar.FindSidebar;
+    module.exports.AutoSave = sidebar.AutoSave;
 }

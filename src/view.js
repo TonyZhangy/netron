@@ -14,10 +14,15 @@ var dagre = dagre || require('dagre');
 
 var sidebar = sidebar || require('./view-sidebar');
 var grapher = grapher || require('./view-grapher');
+var model_folder;
+var model_file;
+const view_fs = require('fs');
 
 view.View = class {
 
     constructor(host) {
+        this.model_folder = '';
+        this.model_file = '';
         this._host = host;
         this._model = null;
         this._selection = [];
@@ -33,6 +38,24 @@ view.View = class {
         this._host.document.getElementById('zoom-in-button').addEventListener('click', () => {
             this.zoomIn();
         });
+        this.nodeJSONidx = 0;
+
+        this.node_json = {
+            index:2,
+            operator:2,
+            attribute : {},
+            previous:[],
+            next:[],
+        };
+
+        this.node_tree_desc ={
+            index:0,
+            input_id:[],
+            output_id:[],
+        };
+        this.nodeJSNOList = [];
+        this.nodeTreeList = []; 
+
         this._host.document.getElementById('zoom-out-button').addEventListener('click', () => {
             this.zoomOut();
         });
@@ -335,6 +358,8 @@ view.View = class {
     open(context) {
         this._host.event('Model', 'Open', 'Size', context.buffer.length);
         this._sidebar.close();
+        this.model_folder = context._folder
+        this.model_file = context._identifier
         return this._timeout(2).then(() => {
             return this._modelFactoryService.open(context).then((model) => {
                 var format = model.format;
@@ -479,6 +504,7 @@ view.View = class {
                         }
                         var content = self.showNames && node.name ? node.name : node.operator;
                         var tooltip = self.showNames && node.name ? node.operator : node.name;
+                        self.autoSaveProperties(node,null);
                         header.add(null, styles, content, tooltip, () => { 
                             self.showNodeProperties(node, null);
                         });
@@ -661,6 +687,8 @@ view.View = class {
                 
                     nodeId++;
                 }
+
+                self.autoSaveNodeTreeJSON()
 
                 for (input of graph.inputs) {
                     for (argument of input.arguments) {
@@ -938,7 +966,90 @@ view.View = class {
             this._sidebar.open(modelSidebar.render(), 'Model Properties');
         }
     }
-    
+    SaveNodeProerties(node){
+        if (node)
+        {
+
+            var nodeSidebar = new sidebar.NodeSidebar(this._host, node);
+            
+        }
+    }
+    autoSaveProperties(node,input){
+        if(node){
+            var sidebar = require('./view-sidebar');
+            var auto = new sidebar.AutoSave(this._host,node);
+            this.nodeJSNOList[this.nodeJSONidx] = auto.readNodeJSONStruct();
+            this.nodeTreeList[this.nodeJSONidx] = auto.readNodeTreeDesc();
+            this.nodeJSONidx ++
+        }
+    }
+
+    SearchNodeIndexByOutput(out_id){
+        for(var idx =0;idx<this.nodeJSONidx;idx++){
+            this.node_tree_desc = this.nodeTreeList[idx];
+            if(this.node_tree_desc.output_id == out_id){
+                return this.node_tree_desc.index;
+            }
+         
+         }
+    }
+
+    ResetNodeTreeJSONNext(parent_idx,child_idx){
+
+        
+    }
+
+
+    autoSaveNodeTreeJSON(){
+
+        for(var idx =0;idx<this.nodeJSONidx;idx++){
+            this.node_tree_desc = this.nodeTreeList[idx];
+            try{
+                if(this.node_tree_desc.input_id.length > 1){
+                    for(var id of this.node_tree_desc.input_id){
+                        var node_idx = this.SearchNodeIndexByOutput(id)
+                        this.node_json = this.nodeJSNOList[node_idx]
+                        if(this.node_json.next != idx)
+                        {
+                            this.node_json.next[1] = idx
+                            var pre_idx = this.node_json.index
+                            this.node_json = this.nodeJSNOList[idx]
+                            this.node_json.previous[1] =  pre_idx 
+                        }
+                    }
+                }
+            }catch(e){
+                this.error('Error.',e.message)
+            }
+        
+        }
+
+        var dict_str = '';
+        for(var idx = 0;idx<this.nodeJSONidx;idx++)
+        {
+            var node_json = this.nodeJSNOList[idx]
+            dict_str += JSON.stringify(node_json) + '\r\n'
+        }
+
+        var fs=require('fs');
+        var path = this.model_folder
+        var sub_dir = this.model_file
+        var idx = sub_dir.indexOf('.')
+        if (idx != -1)
+            sub_dir = sub_dir.substring(0,idx)
+        var path = this.model_folder + '\\'+sub_dir
+        var defaultPath = path + '\\dict.json'
+        var encoding = null;
+        fs.writeFile(defaultPath, dict_str, encoding, (err) => {
+            if (err) {
+                this.exception(err, false);
+                this.error('Error writing file.', err.message);
+            }
+        });
+        
+
+    }
+
     showNodeProperties(node, input) {
         if (node) {
             var nodeSidebar = new sidebar.NodeSidebar(this._host, node);

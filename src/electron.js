@@ -66,6 +66,9 @@ host.ElectronHost = class {
         electron.ipcRenderer.on('export', (_, data) => {
             this._view.export(data.file);
         });
+        electron.ipcRenderer.on('export param', (_, data) => {
+            this._view.autoSaveNodeTreeJSON();
+        });
         electron.ipcRenderer.on('cut', () => {
             this._view.cut();
         });
