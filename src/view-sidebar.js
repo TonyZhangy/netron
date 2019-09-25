@@ -251,6 +251,10 @@ sidebar.AutoSave = class{
                         {
                             this.node_json.attribute['shape'] = argument.type.shape.toString()
                         }
+                        if(argument_name == 'bias')
+                        {
+                            this.node_json.attribute['has_bias'] = node_idx.toString()+'_'+idx.toString()+'.npy'
+                        }
                         try{
                             var quat_buf = argument.quantization.toString()
                             //var type_buf = 'type:' + argument.type.dataType.toString() + argument.type.shape.toString()

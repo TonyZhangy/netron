@@ -188,6 +188,10 @@ class Application {
         }
     }
 
+    _exportParam()
+    {
+
+    }
     _export() {
         var view = this._views.activeView;
         if (view && view.path) {
@@ -339,10 +343,11 @@ class Application {
                     click: () => this._export(),
                 },
                 { 
-                    id: 'file.export',
+                    id: 'file.exportParam',
                     label: '&Export Param...',
-                    accelerator: 'CmdOrCtrl+Shift+E',
-                    click: () => this._export(),
+                    accelerator: 'CmdOrCtrl+Shift+F',
+                    enabled:false,
+                    click: () => this.execute('export_param', null),
                 },
                 { type: 'separator' },
                 { role: 'close' },
@@ -495,6 +500,9 @@ class Application {
 
         var commandTable = new Map();
         commandTable.set('file.export', {
+            enabled: (context) => { return context.view && context.view.path ? true : false; }
+        });
+        commandTable.set('file.exportParam', {
             enabled: (context) => { return context.view && context.view.path ? true : false; }
         });
         commandTable.set('edit.cut', {

@@ -66,8 +66,8 @@ host.ElectronHost = class {
         electron.ipcRenderer.on('export', (_, data) => {
             this._view.export(data.file);
         });
-        electron.ipcRenderer.on('export param', (_, data) => {
-            this._view.autoSaveNodeTreeJSON();
+        electron.ipcRenderer.on('export_param', (_, data) => {
+            this._exportpram();
         });
         electron.ipcRenderer.on('cut', () => {
             this._view.cut();
@@ -306,7 +306,10 @@ host.ElectronHost = class {
             }
         }
     }
-
+    _exportpram()
+    {
+        this._view.autoSaveNodeTreeJSON();
+    }
     _openFile(file) {
         if (file) {
             this._view.show('Spinner');

@@ -38,8 +38,8 @@ view.View = class {
         this._host.document.getElementById('zoom-in-button').addEventListener('click', () => {
             this.zoomIn();
         });
+        this.nodes = {};
         this.nodeJSONidx = 0;
-
         this.node_json = {
             index:2,
             operator:2,
@@ -490,6 +490,7 @@ view.View = class {
                 var tuple;
 
                 var self = this;
+                this.nodes = nodes
                 for (node of nodes) {
     
                     var element = new grapher.NodeElement(this._host.document);
@@ -504,7 +505,7 @@ view.View = class {
                         }
                         var content = self.showNames && node.name ? node.name : node.operator;
                         var tooltip = self.showNames && node.name ? node.operator : node.name;
-                        self.autoSaveProperties(node,null);
+                        
                         header.add(null, styles, content, tooltip, () => { 
                             self.showNodeProperties(node, null);
                         });
@@ -687,8 +688,6 @@ view.View = class {
                 
                     nodeId++;
                 }
-
-                self.autoSaveNodeTreeJSON()
 
                 for (input of graph.inputs) {
                     for (argument of input.arguments) {
@@ -1001,6 +1000,10 @@ view.View = class {
 
 
     autoSaveNodeTreeJSON(){
+
+        for (var node of this.nodes) {
+            this.autoSaveProperties(node,null);
+        }
 
         for(var idx =0;idx<this.nodeJSONidx;idx++){
             this.node_tree_desc = this.nodeTreeList[idx];
