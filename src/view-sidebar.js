@@ -205,7 +205,7 @@ sidebar.AutoSave = class{
 
         this.node_json.previous[0] = node_idx?node_idx-1:0
         this.node_json.next[0] = node_idx + 1
-        
+        this.node_json.attribute['has_bias'] = 'false'
         //gen node tree list
         var outputs = node.outputs;
         if(outputs && outputs.length>0){
@@ -226,8 +226,14 @@ sidebar.AutoSave = class{
                     for (var argument of input.arguments)  {
                         this.node_tree_desc.input_id[input_idx] = argument.id
                         input_idx ++
+
+                        if(argument.id.search('Relu') != -1)
+                        {
+                            this.node_json.attribute['fused_activation_function'] = 'relu'
+                        }
                     }
                 }
+                
             }
         }
 
@@ -253,7 +259,7 @@ sidebar.AutoSave = class{
                         }
                         if(argument_name == 'bias')
                         {
-                            this.node_json.attribute['has_bias'] = node_idx.toString()+'_'+idx.toString()+'.npy'
+                            this.node_json.attribute['has_bias'] = 'true'
                         }
                         try{
                             var quat_buf = argument.quantization.toString()

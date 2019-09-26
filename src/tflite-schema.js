@@ -1378,6 +1378,7 @@ tflite_schema.Conv2DOptions.getSizePrefixedRootAsConv2DOptions = function(bb, ob
  */
 tflite_schema.Conv2DOptions.prototype.padding = function() {
   var offset = this.bb.__offset(this.bb_pos, 4);
+  var value = this.bb.readInt8(this.bb_pos + offset);
   return offset ? /** @type {tflite_schema.Padding} */ (this.bb.readInt8(this.bb_pos + offset)) : tflite_schema.Padding.SAME;
 };
 
@@ -1386,6 +1387,7 @@ tflite_schema.Conv2DOptions.prototype.padding = function() {
  */
 tflite_schema.Conv2DOptions.prototype.strideW = function() {
   var offset = this.bb.__offset(this.bb_pos, 6);
+  var value = this.bb.readInt8(this.bb_pos + offset);
   return offset ? this.bb.readInt32(this.bb_pos + offset) : 0;
 };
 
@@ -1394,6 +1396,7 @@ tflite_schema.Conv2DOptions.prototype.strideW = function() {
  */
 tflite_schema.Conv2DOptions.prototype.strideH = function() {
   var offset = this.bb.__offset(this.bb_pos, 8);
+  var value = this.bb.readInt8(this.bb_pos + offset);
   return offset ? this.bb.readInt32(this.bb_pos + offset) : 0;
 };
 
@@ -1402,7 +1405,8 @@ tflite_schema.Conv2DOptions.prototype.strideH = function() {
  */
 tflite_schema.Conv2DOptions.prototype.fusedActivationFunction = function() {
   var offset = this.bb.__offset(this.bb_pos, 10);
-  return offset ? /** @type {tflite_schema.ActivationFunctionType} */ (this.bb.readInt8(this.bb_pos + offset)) : tflite_schema.ActivationFunctionType.NONE;
+  var value = this.bb.readInt8(this.bb_pos + offset);
+  return offset ? (this.bb.readInt8(this.bb_pos + offset)) : tflite_schema.ActivationFunctionType.NONE;
 };
 
 /**
