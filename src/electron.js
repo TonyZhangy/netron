@@ -308,7 +308,7 @@ host.ElectronHost = class {
     }
     _exportpram()
     {
-        this._view.autoSaveNodeTreeJSON();
+        this._view.SaveNodeTreeJSON();
     }
     _openFile(file) {
         if (file) {

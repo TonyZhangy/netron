@@ -17,6 +17,9 @@ var grapher = grapher || require('./view-grapher');
 var model_folder;
 var model_file;
 const view_fs = require('fs');
+var node_list = {};
+var node_json_list = {}
+var node_idx = 0;
 
 view.View = class {
 
@@ -965,20 +968,12 @@ view.View = class {
             this._sidebar.open(modelSidebar.render(), 'Model Properties');
         }
     }
-    SaveNodeProerties(node){
-        if (node)
-        {
 
-            var nodeSidebar = new sidebar.NodeSidebar(this._host, node);
-            
-        }
-    }
-    autoSaveProperties(node,input){
+    SaveNodeProperties(node,input){
         if(node){
-            var sidebar = require('./view-sidebar');
-            var auto = new sidebar.AutoSave(this._host,node);
-            this.nodeJSNOList[this.nodeJSONidx] = auto.readNodeJSONStruct();
-            this.nodeTreeList[this.nodeJSONidx] = auto.readNodeTreeDesc();
+            var desc = new view.nodedesc(this._host,node);
+            this.nodeJSNOList[this.nodeJSONidx] = desc.readNodeJSONStruct();
+            this.nodeTreeList[this.nodeJSONidx] = desc.readNodeTreeDesc();
             this.nodeJSONidx ++
         }
     }
@@ -993,16 +988,10 @@ view.View = class {
          }
     }
 
-    ResetNodeTreeJSONNext(parent_idx,child_idx){
-
-        
-    }
-
-
-    autoSaveNodeTreeJSON(){
+    SaveNodeTreeJSON(){
 
         for (var node of this.nodes) {
-            this.autoSaveProperties(node,null);
+            this.SaveNodeProperties(node,null);
         }
 
         for(var idx =0;idx<this.nodeJSONidx;idx++){
@@ -1093,6 +1082,235 @@ view.View = class {
         }
     }
 };
+
+view.nodedesc = class{
+    constructor(host, node) {
+
+        
+        this.node_json = {
+            index:2,
+            operator:2,
+            attribute : {},
+            previous:[],
+            next:[],
+        };
+
+        this.node_tree_desc ={
+            index:0,
+            input_id:[],
+            output_id:[],
+        }; 
+
+        this._host = host;
+        this._node = node;
+        this._elements = [];
+        this._attributes = [];
+        this._inputs = [];
+        this._outputs = [];
+
+        var fs=require('fs');
+        var path = host._view.model_folder
+        var sub_dir = host._view.model_file
+        var idx = sub_dir.indexOf('.')
+        if (idx != -1)
+            sub_dir = sub_dir.substring(0,idx)
+        var path = host._view.model_folder + '\\'+sub_dir
+        fs.mkdir(path,function(err){
+            console.log(err);
+        })
+
+        fs.stat(path,function(error,stats){
+            if(error)
+            {
+                fs.mkdir(path);
+            }
+            console.log(path);
+        })
+
+        this.node_json.index = node_idx;
+        this.node_tree_desc.index = node_idx;
+        this.node_json.operator = node.operator;
+        
+        var attributes = node.attributes;
+        if (attributes && attributes.length >0){
+            //var defaultpath = path + '\\'+node._name+'_' + 'attributes.txt'
+            //var att_buf = ''
+            try{
+               
+                for(var att of attributes){
+                    if(att.value){
+                        this.node_json.attribute[att.name] = att.value
+                    }
+                }
+                
+                var tmp_str = JSON.stringify(this.node_json)
+            }catch(e){
+                this.error('Error.',e.message)
+            }
+        }
+
+        this.node_json.previous[0] = node_idx?node_idx-1:0
+        this.node_json.next[0] = node_idx + 1
+        this.node_json.attribute['has_bias'] = 'false'
+        //gen node tree list
+        var outputs = node.outputs;
+        if(outputs && outputs.length>0){
+            for(var out of outputs){
+                for (var argument of out.arguments)  {
+                    this.node_tree_desc.output_id = argument.id
+                }
+            }
+        }
+
+        var inputs = node.inputs;
+        if (inputs && inputs.length > 0) {
+            var input_idx = 0;
+            for (var input of inputs) {
+                if (input.name == 'input' || input.name == 'output'|| node.operator == 'Add') 
+                {
+                    
+                    for (var argument of input.arguments)  {
+                        this.node_tree_desc.input_id[input_idx] = argument.id
+                        input_idx ++
+
+                        if(argument.id.search('Relu') != -1)
+                        {
+                            this.node_json.attribute['fused_activation_function'] = 'relu'
+                        }
+                    }
+                }
+                
+            }
+        }
+
+        //==========================================================
+        //input
+        var inputs = node.inputs;
+        var idx = 0
+        if (inputs && inputs.length > 0) {
+            for (var input of inputs) {
+                if (input.name == 'input' || input.name == 'output') 
+                {
+                    continue
+                }
+                for (var argument of input.arguments)  {
+                    var argument_name = input.name
+                    var defaultPath = argument_name ? argument_name.split('/').join('_').split(':').join('_').split('.').join('_') : 'tensor';
+                    defaultPath = path + '\\'+node_idx.toString()+'_'+idx.toString()+'_quantization.txt'
+                    if(argument.quantization)
+                    {
+                        if(argument_name == 'weights')
+                        {
+                            this.node_json.attribute['shape'] = argument.type.shape.toString()
+                        }
+                        if(argument_name == 'bias')
+                        {
+                            this.node_json.attribute['has_bias'] = 'true'
+                        }
+                        try{
+                            var quat_buf = argument.quantization.toString()
+                            //var type_buf = 'type:' + argument.type.dataType.toString() + argument.type.shape.toString()
+                            //quat_buf = type_buf + '\r\n' + quat_buf
+                            
+                        }catch(e)
+                        {
+                            this.error('Error.',e.message)
+                        }
+                        //var blob = new Blob(defaultPath,argument.quantization, { type: 'application/octet-stream' });
+                        var encoding = null;
+                        fs.writeFile(defaultPath, quat_buf, encoding, (err) => {
+                            if (err) {
+                                this.exception(err, false);
+                                this.error('Error writing file.', err.message);
+                            }
+                        });
+                    }
+                    var initializer = argument.initializer
+                    if(initializer != null)
+                    {
+                        var argument_name = input.name
+                        var defaultPath = argument_name ? argument_name.split('/').join('_').split(':').join('_').split('.').join('_') : 'tensor';
+                        defaultPath = path + '\\' +node_idx.toString()+'_'+idx.toString()+'.npy'
+                        
+                        var numpy = require('./numpy');                 
+                            
+                            var tensor = initializer
+                            
+                            var array = new numpy.Array(tensor.value, tensor.type.dataType, tensor.type.shape.dimensions);
+                            //var array = new numpy.Array(initializer.value, initializer.type.dataType, initializer.type.shape.dimensions);
+                            var blob = new Blob([ array.toBuffer() ], { type: 'application/octet-stream' });
+                            this._host.export(defaultPath, blob);
+
+                        
+                    }
+                    idx ++
+                }
+            }
+            
+        }
+
+        node_idx ++
+        //output
+        /*
+        var outputs = node.outputs;
+        if(outputs && outputs.length>0){
+            for(var out of outputs){
+                for (var argument of out.arguments)  {
+                    var argument_name = argument._id
+                    var defaultPath = argument_name ? argument_name.split('/').join('_').split(':').join('_').split('.').join('_') : 'tensor';
+                    defaultPath = path + '\\'+node._name+'_'+node.operator+'_output_' + defaultPath+'_quantization.txt'
+                    if(argument.quantization)
+                    {
+                        try{
+                            var quat_buf = 'quantization:'+argument.quantization.toString()
+                            var type_buf = 'type:' + argument.type.dataType.toString() + argument.type.shape.toString()
+                            quat_buf = type_buf + '\r\n' + quat_buf
+                            
+                        }catch(e)
+                        {
+                            this.error('Error.',e.message)
+                        }
+                        //var blob = new Blob(defaultPath,argument.quantization, { type: 'application/octet-stream' });
+                        var encoding = null;
+                        fs.writeFile(defaultPath, quat_buf, encoding, (err) => {
+                            if (err) {
+                                this.exception(err, false);
+                                this.error('Error writing file.', err.message);
+                            }
+                        });
+                    }
+                    var initializer = argument.initializer
+                    if(initializer != null)
+                    {
+                        var argument_name = initializer.name
+                        var defaultPath = argument_name ? argument_name.split('/').join('_').split(':').join('_').split('.').join('_') : 'tensor';
+                        defaultPath = path + '\\' +node._name+'_'+node.operator+'_output_' +  defaultPath+'.npy'
+                        var numpy = require('./numpy');                 
+                            
+                            var tensor = initializer
+                            
+                            var array = new numpy.Array(tensor.value, tensor.type.dataType, tensor.type.shape.dimensions);
+                            //var array = new numpy.Array(initializer.value, initializer.type.dataType, initializer.type.shape.dimensions);
+                            var blob = new Blob([ array.toBuffer() ], { type: 'application/octet-stream' });
+                            this._host.export(defaultPath, blob);
+
+                        
+                    }
+                }
+            }
+
+        }*/
+    }
+
+    readNodeJSONStruct() {
+        return this.node_json;
+    }
+
+    readNodeTreeDesc() {
+        return this.node_tree_desc;
+    }
+};
+
 
 class ModelError extends Error {
     constructor(message) {
