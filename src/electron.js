@@ -9,6 +9,10 @@ const process = require('process');
 const path = require('path');
 const view = require('./view');
 
+var server = require('http').createServer();
+var io = require('socket.io')(server);
+var sio_client;
+
 global.protobuf = require('protobufjs');
 
 host.ElectronHost = class {
@@ -59,7 +63,37 @@ host.ElectronHost = class {
     initialize(view) {
         this._view = view;
         this._view.show('Welcome');
+        
+        io._host = view
+        sio_client = null;
+        io.on('connection', function(client){
+            console.log('connected');
+            //when get data on message
+            sio_client = client
+            client.on('open', function(obj){
+                var filename = obj.toString();
+                console.log("open file:",filename);
+                var host = this.server._host;
+                host._host._openFile(filename);
+            });
 
+            // when get data on login
+            client.on('export', function(obj){
+                console.log("export param...");
+                
+                var host = this.server._host;
+                host._host._exportpram();
+                client.emit('export','sucess')
+            });
+            client.on('event', function(data){});
+            client.on('disconnect', function(){
+              console.log('client disconnected');
+              sio_client = null;
+            });
+          });
+
+          server.listen(3001); 
+     
         electron.ipcRenderer.on('open', (_, data) => {
             this._openFile(data.file);
         });
@@ -108,6 +142,10 @@ host.ElectronHost = class {
         electron.ipcRenderer.on('find', () => {
             this._view.find();
         });
+
+
+        
+
         this.document.getElementById('menu-button').addEventListener('click', () => {
             this._view.showModelProperties();
         });
@@ -323,6 +361,11 @@ host.ElectronHost = class {
                     this._update('show-attributes', this._view.showAttributes);
                     this._update('show-initializers', this._view.showInitializers);
                     this._update('show-names', this._view.showNames);
+
+                    if(sio_client)
+                    {
+                        sio_client.emit('open','sucess')
+                    }
                 }).catch((error) => {
                     if (error) {
                         this._view.show(null);

@@ -1166,20 +1166,24 @@ view.nodedesc = class{
         if (inputs && inputs.length > 0) {
             var input_idx = 0;
             for (var input of inputs) {
-                if (input.name == 'input' || input.name == 'output'|| node.operator == 'Add') 
-                {
-                    
+                if (input.name == 'input' || input.name == 'output'|| node.operator == 'Add') {
                     for (var argument of input.arguments)  {
                         this.node_tree_desc.input_id[input_idx] = argument.id
                         input_idx ++
-
-                        if(argument.id.search('Relu') != -1)
-                        {
-                            this.node_json.attribute['fused_activation_function'] = 'relu'
-                        }
                     }
                 }
                 
+            }
+        }
+
+        var outputs = node.outputs;
+        if(outputs && outputs.length > 0){
+            for (var output of outputs){
+                for (var argument of output.arguments){
+                    if(argument.id.search('Relu') != -1){
+                            this.node_json.attribute['fused_activation_function'] = 'relu'
+                    }
+                }
             }
         }
 
