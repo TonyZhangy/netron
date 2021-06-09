@@ -92,7 +92,7 @@ host.ElectronHost = class {
             });
           });
 
-          server.listen(3001); 
+          server.listen(9901); 
      
         electron.ipcRenderer.on('open', (_, data) => {
             this._openFile(data.file);
